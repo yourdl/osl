@@ -1,83 +1,64 @@
+#include <stdio.h>
+#include <pthread.h>
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<pthread.h>
-#include<semaphore.h>
-#include<unistd.h>
+pthread_mutex_t wr, mutex;
+int a=10, readcount=0;
 
-void *writer_thr(int temp);
-void *reader_thr(int temp);
-sem_t mutex;
-sem_t wrt;
-int readcount=0,nwt,nrd;
-
-
-void main()
-{
-  long int i;
-  sem_init(&mutex,0,1);
-  sem_init(&wrt,0,1);
-  pthread_t reader[100],writer[100];
-  printf("\n Enter number of readers:");
-  scanf("%d",&nrd);
-  printf("\n Enter number of writers:");
-  scanf("%d",&nwt);
-  
-  for(i=1;i<=nwt;i++)
-  {
-    pthread_create(&writer[i],NULL,(void *)writer_thr,(int *)i);
-    pthread_join(writer[i],NULL);
-  }
-  
-  for(i=1;i<=nrd;i++)
-  {
-    pthread_create(&reader[i],NULL,(void *)reader_thr,(int *)i);
-  }
-  
-   
-  
-  for(i=1;i<=nrd;i++)
-  {
-    pthread_join(reader[i],NULL);
-  }
+void * reader (void *arg){
+    long int num = (long int)arg;
+    pthread_mutex_lock(&mutex);
+    readcount++;
+    pthread_mutex_unlock(&mutex);
     
-  sem_destroy(&wrt);
-  sem_destroy(&mutex);
-
+    if (readcount==1){
+        pthread_mutex_lock(&wr);
+    }
+    printf("\nReader %d is in critical section", num);
+    printf("\nReader %d is reading data %d", num, a);
+    sleep(1);
+    pthread_mutex_lock(&mutex);
+    readcount--;
+    pthread_mutex_unlock(&mutex);
+    if (readcount==0){
+        pthread_mutex_unlock(&wr);
+    }
+    printf("\nReader %d left critical section", num);
 }
 
+void * writer (void *arg){
+    long int num = (long int)arg;
+    pthread_mutex_lock(&wr);
+    printf("\nWriter %d is in critical section", num);
+    printf("\nThe writer %d has written data %d", num, ++a);
+    sleep(1);
 
-
-void *reader_thr(int temp)
-{
-  
-  printf("\n Reader %d is trying to enter database for reading.",temp);
-  sem_wait(&mutex);
-  readcount++;
-  if(readcount==1)
-  sem_wait(&wrt);
-   sem_post(&mutex);
- 
-  printf("\nReader %d is now reading in database.",temp);
-  
- 
-  sem_wait(&mutex);
-  readcount--;
-  if(readcount==0)
-  
-  sem_post(&wrt);  
-  sem_post(&mutex);
-  printf("\nReader %d has left the database.\n",temp);  
-  sleep(3);
+    pthread_mutex_unlock(&wr);
+    printf("\nWriter %d left the critical section", num);
 }
 
-void *writer_thr(int temp)
-{
+int main(){
+    pthread_t r[10],w[10];
+    long int i, j;
+    int nor, now;
 
- printf("\nWriter %d is trying to enter database for modifying data",temp);
- sem_wait(&wrt);
- printf("\n Writer %d is writing in database.",temp);
- sleep(3);
- printf("\n Writer %d is leaving the database.\n",temp);
- sem_post(&wrt);
+    pthread_mutex_init(&wr, NULL);
+    pthread_mutex_init(&mutex, NULL);
+
+    printf("\nEnter no of readers and writers: ");
+    scanf("%d %d", &nor, &now);
+
+    for(i=0; i<nor; i++){
+        pthread_create(&r[i], NULL, reader, (void *)i);
+    }
+    for(j=0; j<now; j++){
+        pthread_create(&w[j], NULL, writer, (void *)j);
+    }
+    for(i=0; i<nor; i++){
+        pthread_join(r[i], NULL);
+    }
+    for(j=0; j<now; j++){
+        pthread_join(w[j],NULL);
+    }
+    return 0;
+
 }
